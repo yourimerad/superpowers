@@ -1,117 +1,105 @@
 ---
 name: using-superpowers
-description: Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions
+description: Use when starting any conversation — establishes how to find and use skills
 ---
 
 <SUBAGENT-STOP>
-If you were dispatched as a subagent to execute a specific task, skip this skill.
+If dispatched as a subagent for a specific task, skip this skill.
 </SUBAGENT-STOP>
 
-<EXTREMELY-IMPORTANT>
-If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+If a skill clearly applies, invoke it. For standard/critical tier work (see Risk Tiers), invoking applicable skills is required. For trivial tier, skip process skills — the Golden Rule still applies.
 
-IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+## Priority
 
-This is not negotiable. This is not optional. You cannot rationalize your way out of this.
-</EXTREMELY-IMPORTANT>
+User instructions (CLAUDE.md/AGENTS.md, direct requests) > Superpowers skills > default system prompt.
 
-## Instruction Priority
+## Access
 
-Superpowers skills override default system prompt behavior, but **user instructions always take precedence**:
+- Claude Code / Copilot CLI: `Skill` / `skill` tool. Never Read skill files directly.
+- Gemini CLI: `activate_skill`.
+- Tool-name differences across platforms: `references/copilot-tools.md`, `references/codex-tools.md`.
 
-1. **User's explicit instructions** (CLAUDE.md, GEMINI.md, AGENTS.md, direct requests) — highest priority
-2. **Superpowers skills** — override default system behavior where they conflict
-3. **Default system prompt** — lowest priority
+## Risk Tiers
 
-If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "always use TDD," follow the user's instructions. The user is in control.
+Classify the work before picking ceremony. Default when ambiguous: **standard**. Anything touching a Non-Negotiable is **critical**, regardless of surface signals.
 
-## How to Access Skills
+| Tier | Signals | Ceremony |
+|------|---------|----------|
+| **trivial** | Typo, config tweak, copy change, single-line fix, comment, rename | Skip brainstorming/plan; code + final verification |
+| **standard** | New feature in existing module, bug fix needing investigation, 1-3 file refactor | Light brainstorming if unclear, plan optional, TDD, review at sprint end |
+| **critical** | Security/auth, migrations, RLS, destructive ops, cross-cutting arch, new dep, >5 files or >200 LoC | Full brainstorming, full plan, subagent-driven-dev with per-batch reviews, full final review |
 
-**In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you—follow it directly. Never use the Read tool on skill files.
+## Non-Negotiables
 
-**In Copilot CLI:** Use the `skill` tool. Skills are auto-discovered from installed plugins. The `skill` tool works the same as Claude Code's `Skill` tool.
+Bypass tiering — always critical:
 
-**In Gemini CLI:** Skills activate via the `activate_skill` tool. Gemini loads skill metadata at session start and activates the full content on demand.
+- Secrets / credentials / `.env`
+- Auth, authorization, session
+- Supabase RLS or data migrations
+- Destructive ops (`rm -rf`, `DROP TABLE`, force-push to main)
+- New external dependencies
+- CI/CD hooks, deploy scripts
 
-**In other environments:** Check your platform's documentation for how skills are loaded.
+## Sprint Mode
 
-## Platform Adaptation
+A plan (or ad-hoc task batch) = one sprint. Ceremony at **boundaries** + **critical checkpoints**, not between every step.
 
-Skills use Claude Code tool names. Non-CC platforms: see `references/copilot-tools.md` (Copilot CLI), `references/codex-tools.md` (Codex) for tool equivalents. Gemini CLI users get the tool mapping loaded automatically via GEMINI.md.
+**Sprint entry (once):** acknowledge Golden Rule, confirm tier, skim plan for non-negotiables.
 
-# Using Skills
+**Sprint exit (once):** full verification, tier-scaled final review, `finishing-a-development-branch`.
 
-## The Rule
+**Mid-sprint triggers (mini-review only when these fire):**
+- 3+ consecutive failed fix attempts → `systematic-debugging` Phase 1
+- Scope creep beyond plan → pause, ask
+- Touching a Non-Negotiable → full review before commit
+- Batch of 3-5 tasks complete (subagent-driven-dev) → batched review pair
 
-**Invoke relevant or requested skills BEFORE any response or action.** Even a 1% chance a skill might apply means that you should invoke the skill to check. If an invoked skill turns out to be wrong for the situation, you don't need to use it.
+Per-task / per-commit / per-claim ceremony is **not** a mid-sprint trigger.
 
-```dot
-digraph skill_flow {
-    "User message received" [shape=doublecircle];
-    "About to EnterPlanMode?" [shape=doublecircle];
-    "Already brainstormed?" [shape=diamond];
-    "Invoke brainstorming skill" [shape=box];
-    "Might any skill apply?" [shape=diamond];
-    "Invoke Skill tool" [shape=box];
-    "Announce: 'Using [skill] to [purpose]'" [shape=box];
-    "Has checklist?" [shape=diamond];
-    "Create TodoWrite todo per item" [shape=box];
-    "Follow skill exactly" [shape=box];
-    "Respond (including clarifications)" [shape=doublecircle];
+## Autonomy on Clear Asks
 
-    "About to EnterPlanMode?" -> "Already brainstormed?";
-    "Already brainstormed?" -> "Invoke brainstorming skill" [label="no"];
-    "Already brainstormed?" -> "Might any skill apply?" [label="yes"];
-    "Invoke brainstorming skill" -> "Might any skill apply?";
+When the request is unambiguous and tier is trivial/standard, execute end-to-end in a single run. Don't invent approval gates where the work is already decided.
 
-    "User message received" -> "Might any skill apply?";
-    "Might any skill apply?" -> "Invoke Skill tool" [label="yes, even 1%"];
-    "Might any skill apply?" -> "Respond (including clarifications)" [label="definitely not"];
-    "Invoke Skill tool" -> "Announce: 'Using [skill] to [purpose]'";
-    "Announce: 'Using [skill] to [purpose]'" -> "Has checklist?";
-    "Has checklist?" -> "Create TodoWrite todo per item" [label="yes"];
-    "Has checklist?" -> "Follow skill exactly" [label="no"];
-    "Create TodoWrite todo per item" -> "Follow skill exactly";
-}
+**Don't ask for:**
+- Cosmetic defaults (colors, copy, icons) — pick, state inline, continue
+- Reversible conventions already visible in the codebase — follow them
+- Routine section walkthroughs once architecture is approved — continue
+- Confirmation that the obvious next step is obvious — do it
+
+**Do stop for:**
+- Non-Negotiables (above)
+- Scope creep beyond the request
+- Genuine ambiguity with no reasonable default
+- Real tradeoff with no obvious winner
+
+Default: pick the obvious-default, note it inline, keep moving. Users redirect faster than they answer unnecessary questions.
+
+## The Golden Rule (Surgical Edits)
+
+Applies to every task, every subagent, every refactor — regardless of tier:
+
+1. **MINIMAL** — change as little as possible
+2. **SURGICAL** — only what the task requires; no opportunistic cleanup or style churn
+3. **REUSE > CREATE** — extend existing helpers/hooks/patterns
+4. **AGGREGATE > FRAGMENT** — one solution over several specialized ones
+5. **DIRECTED REFACTOR** — factor only across sites you already touch; note out-of-scope duplications but don't fix
+6. **UNCERTAINTY = ASK** — new lib/pattern/folder → ask, don't add silently
+
+## Subagent Directive Block
+
+Paste verbatim at the top of every subagent prompt:
+
 ```
+## Directive — Surgical Edits (non-negotiable)
 
-## Red Flags
+1. MINIMAL: change only what the task requires
+2. SURGICAL: no opportunistic refactor, no style churn, no unrelated cleanup
+3. REUSE > CREATE: extend existing code; don't duplicate
+4. AGGREGATE > FRAGMENT: one solution over several
+5. DIRECTED REFACTOR: factor only across sites you already touch
+6. UNCERTAINTY = ASK: new lib / pattern / folder → report BLOCKED with a scope concern
 
-These thoughts mean STOP—you're rationalizing:
-
-| Thought | Reality |
-|---------|---------|
-| "This is just a simple question" | Questions are tasks. Check for skills. |
-| "I need more context first" | Skill check comes BEFORE clarifying questions. |
-| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
-| "I can check git/files quickly" | Files lack conversation context. Check for skills. |
-| "Let me gather information first" | Skills tell you HOW to gather information. |
-| "This doesn't need a formal skill" | If a skill exists, use it. |
-| "I remember this skill" | Skills evolve. Read current version. |
-| "This doesn't count as a task" | Action = task. Check for skills. |
-| "The skill is overkill" | Simple things become complex. Use it. |
-| "I'll just do this one thing first" | Check BEFORE doing anything. |
-| "This feels productive" | Undisciplined action wastes time. Skills prevent this. |
-| "I know what that means" | Knowing the concept ≠ using the skill. Invoke it. |
-
-## Skill Priority
-
-When multiple skills could apply, use this order:
-
-1. **Process skills first** (brainstorming, debugging) - these determine HOW to approach the task
-2. **Implementation skills second** (frontend-design, mcp-builder) - these guide execution
-
-"Let's build X" → brainstorming first, then implementation skills.
-"Fix this bug" → debugging first, then domain-specific skills.
-
-## Skill Types
-
-**Rigid** (TDD, debugging): Follow exactly. Don't adapt away discipline.
-
-**Flexible** (patterns): Adapt principles to context.
-
-The skill itself tells you which.
-
-## User Instructions
-
-Instructions say WHAT, not HOW. "Add X" or "Fix Y" doesn't mean skip workflows.
+Scope guard: if the task would produce more than 2 new files, more than ~150 LoC,
+or require a new external dependency, STOP and report DONE_WITH_CONCERNS with a
+scope note before implementing the oversized version.
+```
