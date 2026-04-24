@@ -1,198 +1,120 @@
-# Superpowers
+# Superpowers (surgical fork)
 
-Superpowers is a complete software development methodology for your coding agents, built on top of a set of composable skills and some initial instructions that make sure your agent uses them.
+Fork of [obra/superpowers](https://github.com/obra/superpowers) with two key changes:
 
-## How it works
+1. **Ceremony at sprint boundaries, not per commit** — explicit Risk Tiers (trivial / standard / critical) decide how much process applies. One plan = one sprint, reviews happen at entry + exit + real mid-sprint signals, not between every step.
+2. **The Golden Rule (surgical edits) is the default** — MINIMAL / SURGICAL / REUSE > CREATE / AGGREGATE > FRAGMENT / DIRECTED REFACTOR / UNCERTAINTY = ASK. Enforced per task, per subagent, per refactor, regardless of tier.
 
-It starts from the moment you fire up your coding agent. As soon as it sees that you're building something, it *doesn't* just jump into trying to write code. Instead, it steps back and asks you what you're really trying to do. 
+Two variants ship from this repo:
 
-Once it's teased a spec out of the conversation, it shows it to you in chunks short enough to actually read and digest. 
+| Plugin | Target model | What's trimmed |
+|---|---|---|
+| `superpowers-surgical` | Any Claude model | Nothing — full skeleton with all rationalization tables and anti-cheat prose from upstream. |
+| `superpowers-smart` | Opus 4.7+ / Sonnet 4.6+ | Same skeleton with tautological "don't rationalize" prose stripped. Careful-by-default models don't need the pedagogy. |
 
-After you've signed off on the design, your agent puts together an implementation plan that's clear enough for an enthusiastic junior engineer with poor taste, no judgement, no project context, and an aversion to testing to follow. It emphasizes true red/green TDD, YAGNI (You Aren't Gonna Need It), and DRY. 
+`superpowers-smart` also adds **Autonomy on Clear Asks** — batched questions with recommended defaults, single architecture-level approval (no per-section gates), inline cosmetic defaults. Turns "9 approval hops per brainstorming" back into "one run, end-to-end".
 
-Next up, once you say "go", it launches a *subagent-driven-development* process, having agents work through each engineering task, inspecting and reviewing their work, and continuing forward. It's not uncommon for Claude to be able to work autonomously for a couple hours at a time without deviating from the plan you put together.
-
-There's a bunch more to it, but that's the core of the system. And because the skills trigger automatically, you don't need to do anything special. Your coding agent just has Superpowers.
-
-
-## Sponsorship
-
-If Superpowers has helped you do stuff that makes money and you are so inclined, I'd greatly appreciate it if you'd consider [sponsoring my opensource work](https://github.com/sponsors/obra).
-
-Thanks! 
-
-- Jesse
-
-
-## Installation
-
-**Note:** Installation differs by platform. 
-
-### Claude Code Official Marketplace
-
-Superpowers is available via the [official Claude plugin marketplace](https://claude.com/plugins/superpowers)
-
-Install the plugin from Anthropic's official marketplace:
-
-```bash
-/plugin install superpowers@claude-plugins-official
-```
-
-### Claude Code (Superpowers Marketplace)
-
-The Superpowers marketplace provides Superpowers and some other related plugins for Claude Code.
-
-In Claude Code, register the marketplace first:
-
-```bash
-/plugin marketplace add obra/superpowers-marketplace
-```
-
-Then install the plugin from this marketplace:
-
-```bash
-/plugin install superpowers@superpowers-marketplace
-```
-
-### OpenAI Codex CLI
-
-- Open plugin search interface
-
-```bash
-/plugins
-```
-
-Search for Superpowers
-
-```bash
-superpowers
-```
-
-Select `Install Plugin`
-
-### OpenAI Codex App
-
-- In the Codex app, click on Plugins in the sidebar.
-- You should see `Superpowers` in the Coding section. 
-- Click the `+` next to Superpowers and follow the prompts.
-
-
-### Cursor (via Plugin Marketplace)
-
-In Cursor Agent chat, install from marketplace:
-
-```text
-/add-plugin superpowers
-```
-
-or search for "superpowers" in the plugin marketplace.
-
-### OpenCode
-
-Tell OpenCode:
+## Install
 
 ```
-Fetch and follow instructions from https://raw.githubusercontent.com/obra/superpowers/refs/heads/main/.opencode/INSTALL.md
+/plugin marketplace add yourimerad/superpowers-marketplace
+/plugin install superpowers-smart@yourimerad-superpowers
 ```
 
-**Detailed docs:** [docs/README.opencode.md](docs/README.opencode.md)
+Or `superpowers-surgical` for the non-compressed variant.
 
-### GitHub Copilot CLI
+**Uninstall upstream `superpowers` first** — the skill namespace collides.
 
-```bash
-copilot plugin marketplace add obra/superpowers-marketplace
-copilot plugin install superpowers@superpowers-marketplace
+Marketplace repo: [yourimerad/superpowers-marketplace](https://github.com/yourimerad/superpowers-marketplace).
+
+## What changed vs upstream
+
+### New: Risk Tiers
+
+Classify the work before picking ceremony. Default when ambiguous: **standard**. Anything touching a Non-Negotiable is **critical**, regardless of surface signals.
+
+| Tier | Signals | Ceremony |
+|---|---|---|
+| **trivial** | Typo, config tweak, copy change, single-line fix, comment, rename | Skip brainstorming/plan; code + final verification |
+| **standard** | New feature in existing module, bug fix needing investigation, 1-3 file refactor | Light brainstorming if unclear, plan optional, TDD, review at sprint end |
+| **critical** | Security/auth, migrations, RLS, destructive ops, cross-cutting arch, new dep, >5 files or >200 LoC | Full brainstorming, full plan, subagent-driven-dev with per-batch reviews, full final review |
+
+### New: Non-Negotiables
+
+Bypass tiering — always critical:
+
+- Secrets / credentials / `.env`
+- Auth, authorization, session
+- Supabase RLS or data migrations
+- Destructive ops (`rm -rf`, `DROP TABLE`, force-push to main)
+- New external dependencies
+- CI/CD hooks, deploy scripts
+
+### New: Sprint Mode
+
+A plan (or ad-hoc task batch) = one sprint. Ceremony at **boundaries** + **critical checkpoints**, not between every step.
+
+- **Sprint entry (once):** acknowledge Golden Rule, confirm tier, skim plan for non-negotiables.
+- **Sprint exit (once):** full verification, tier-scaled final review, `finishing-a-development-branch`.
+- **Mid-sprint triggers** (mini-review only when these fire): 3+ consecutive failed fix attempts, scope creep beyond plan, touching a Non-Negotiable, batch of 3-5 tasks complete in subagent-driven-dev.
+
+Per-task / per-commit / per-claim ceremony is **not** a mid-sprint trigger.
+
+### New: Subagent Directive Block
+
+Paste verbatim at the top of every subagent prompt — enforces the Golden Rule + scope guard:
+
+```
+## Directive — Surgical Edits (non-negotiable)
+
+1. MINIMAL: change only what the task requires
+2. SURGICAL: no opportunistic refactor, no style churn, no unrelated cleanup
+3. REUSE > CREATE: extend existing code; don't duplicate
+4. AGGREGATE > FRAGMENT: one solution over several
+5. DIRECTED REFACTOR: factor only across sites you already touch
+6. UNCERTAINTY = ASK: new lib / pattern / folder → report BLOCKED with a scope concern
+
+Scope guard: if the task would produce more than 2 new files, more than ~150 LoC,
+or require a new external dependency, STOP and report DONE_WITH_CONCERNS with a
+scope note before implementing the oversized version.
 ```
 
-### Gemini CLI
+### Smart variant only: Autonomy on Clear Asks
 
-```bash
-gemini extensions install https://github.com/obra/superpowers
-```
+When the request is unambiguous and tier is trivial/standard, execute end-to-end in a single run. Explicit don't-ask / do-stop lists replace the "ask-per-section" default.
 
-To update:
+**Don't ask for:** cosmetic defaults (colors, copy, icons), reversible conventions already visible in the codebase, routine section walkthroughs once architecture is approved, confirmation that the obvious next step is obvious.
 
-```bash
-gemini extensions update superpowers
-```
+**Do stop for:** Non-Negotiables, scope creep beyond the request, genuine ambiguity with no reasonable default, real tradeoff with no obvious winner.
 
-## The Basic Workflow
+## Workflow
 
-1. **brainstorming** - Activates before writing code. Refines rough ideas through questions, explores alternatives, presents design in sections for validation. Saves design document.
+Unchanged from upstream:
 
-2. **using-git-worktrees** - Activates after design approval. Creates isolated workspace on new branch, runs project setup, verifies clean test baseline.
+1. **brainstorming** → design doc
+2. **using-git-worktrees** → isolated branch
+3. **writing-plans** → bite-sized tasks
+4. **subagent-driven-development** / **executing-plans** → sprint
+5. **test-driven-development** → RED-GREEN-REFACTOR inside each task
+6. **requesting-code-review** → batch-end review
+7. **finishing-a-development-branch** → merge / PR / keep / discard
 
-3. **writing-plans** - Activates with approved design. Breaks work into bite-sized tasks (2-5 minutes each). Every task has exact file paths, complete code, verification steps.
+What changed is *how much ceremony each step carries* — scaled to tier, concentrated at sprint boundaries.
 
-4. **subagent-driven-development** or **executing-plans** - Activates with plan. Dispatches fresh subagent per task with two-stage review (spec compliance, then code quality), or executes in batches with human checkpoints.
+## Version
 
-5. **test-driven-development** - Activates during implementation. Enforces RED-GREEN-REFACTOR: write failing test, watch it fail, write minimal code, watch it pass, commit. Deletes code written before tests.
+Current release: `v5.0.7-surgical.1` (surgical) / `v5.0.7-surgical-smart.2` (smart).
 
-6. **requesting-code-review** - Activates between tasks. Reviews against plan, reports issues by severity. Critical issues block progress.
+See [RELEASE-NOTES.md](RELEASE-NOTES.md) for per-tag deltas.
 
-7. **finishing-a-development-branch** - Activates when tasks complete. Verifies tests, presents options (merge/PR/keep/discard), cleans up worktree.
+## Credits & license
 
-**The agent checks for relevant skills before any task.** Mandatory workflows, not suggestions.
+Upstream: [obra/superpowers](https://github.com/obra/superpowers) by [Jesse Vincent](https://blog.fsck.com) and [Prime Radiant](https://primeradiant.com). All core skill architecture, TDD rigor, and systematic-debugging patterns are theirs.
 
-## What's Inside
+This fork: [@yourimerad](https://github.com/yourimerad). Ceremony refactor + smart compression.
 
-### Skills Library
+MIT License — inherits from upstream. See [LICENSE](LICENSE).
 
-**Testing**
-- **test-driven-development** - RED-GREEN-REFACTOR cycle (includes testing anti-patterns reference)
+## Upstream contribution note
 
-**Debugging**
-- **systematic-debugging** - 4-phase root cause process (includes root-cause-tracing, defense-in-depth, condition-based-waiting techniques)
-- **verification-before-completion** - Ensure it's actually fixed
-
-**Collaboration** 
-- **brainstorming** - Socratic design refinement
-- **writing-plans** - Detailed implementation plans
-- **executing-plans** - Batch execution with checkpoints
-- **dispatching-parallel-agents** - Concurrent subagent workflows
-- **requesting-code-review** - Pre-review checklist
-- **receiving-code-review** - Responding to feedback
-- **using-git-worktrees** - Parallel development branches
-- **finishing-a-development-branch** - Merge/PR decision workflow
-- **subagent-driven-development** - Fast iteration with two-stage review (spec compliance, then code quality)
-
-**Meta**
-- **writing-skills** - Create new skills following best practices (includes testing methodology)
-- **using-superpowers** - Introduction to the skills system
-
-## Philosophy
-
-- **Test-Driven Development** - Write tests first, always
-- **Systematic over ad-hoc** - Process over guessing
-- **Complexity reduction** - Simplicity as primary goal
-- **Evidence over claims** - Verify before declaring success
-
-Read [the original release announcement](https://blog.fsck.com/2025/10/09/superpowers/).
-
-## Contributing
-
-The general contribution process for Superpowers is below. Keep in mind that we don't generally accept contributions of new skills and that any updates to skills must work across all of the coding agents we support.
-
-1. Fork the repository
-2. Switch to the 'dev' branch
-3. Create a branch for your work
-4. Follow the `writing-skills` skill for creating and testing new and modified skills
-5. Submit a PR, being sure to fill in the pull request template.
-
-See `skills/writing-skills/SKILL.md` for the complete guide.
-
-## Updating
-
-Superpowers updates are somewhat coding-agent dependent, but are often automatic.
-
-## License
-
-MIT License - see LICENSE file for details
-
-## Community
-
-Superpowers is built by [Jesse Vincent](https://blog.fsck.com) and the rest of the folks at [Prime Radiant](https://primeradiant.com).
-
-- **Discord**: [Join us](https://discord.gg/35wsABTejz) for community support, questions, and sharing what you're building with Superpowers
-- **Issues**: https://github.com/obra/superpowers/issues
-- **Release announcements**: [Sign up](https://primeradiant.com/superpowers/) to get notified about new versions
+New skills or cross-agent changes should go upstream ([obra/superpowers](https://github.com/obra/superpowers)), not here. This fork stays focused on the Sprint Mode / Risk Tiers / Golden Rule deltas and their compressed variant.
